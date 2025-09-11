@@ -40,3 +40,6 @@ SELECT name, grade FROM Students;
 SELECT grade, COUNT(*) AS total_students
 FROM Students
 GROUP BY grade;
+
+
+
