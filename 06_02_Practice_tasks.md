@@ -1,102 +1,192 @@
-#MySQL Practice Tasks — Views, Functions, Procedures
+# MySQL Practice Tasks — Views, Functions, Procedures (Movies Dataset)
+
+This set uses a tiny **Movies** dataset (no `orders`/`customers`).  
+Each task includes the **necessary table creation** and **sample inserts** so you can run it from scratch.
+
+---
 
 ## 📝 Task 1: Create a Simple View (0.25)
-Create a view named **`v_customer_totals`** in database **`p05`** that summarizes totals per customer from tables **`customers`** and **`orders`**.
 
-**Requirements:**
-- Columns: `customer_id`, `segment` (use `COALESCE(segment,'Unknown')`), `total_orders` (`COUNT(o.order_id)`), `total_spend` (`SUM(IFNULL(o.amount,0))`)
-- Join `customers c` to `orders o` on `c.customer_id = o.customer_id` (LEFT JOIN so customers with no orders still appear)
-- Group by `c.customer_id, c.segment`
+Create a view named **`v_director_stats`** in database **`p05`** that summarizes films per director.
+
+### Starter schema + sample data
+```sql
+-- Create isolated sandbox
+DROP DATABASE IF EXISTS p05;
+CREATE DATABASE p05;
+USE p05;
+
+-- Base tables
+CREATE TABLE directors (
+  director_id INT PRIMARY KEY,
+  name        VARCHAR(50) NOT NULL
+);
+
+CREATE TABLE movies (
+  movie_id     INT PRIMARY KEY,
+  director_id  INT,
+  title        VARCHAR(100) NOT NULL,
+  release_year INT,
+  rating       DECIMAL(3,1),       -- e.g., 7.5
+  FOREIGN KEY (director_id) REFERENCES directors(director_id)
+);
+
+-- Sample data
+INSERT INTO directors VALUES
+  (1, 'Greta Gerwig'),
+  (2, 'Christopher Nolan'),
+  (3, 'Hayao Miyazaki');
+
+INSERT INTO movies VALUES
+  (101, 1, 'Lady Bird',           2017, 7.4),
+  (102, 1, 'Little Women',        2019, 7.8),
+  (201, 2, 'Inception',           2010, 8.8),
+  (202, 2, 'Interstellar',        2014, 8.6),
+  (301, 3, 'Spirited Away',       2001, 8.6),
+  (302, 3, 'Howl''s Moving Castle', 2004, 8.2);
+```
+
+### Your task
+Create **`v_director_stats`** with columns:
+- `director_id`
+- `director_name` (from `directors.name`)
+- `film_count` (`COUNT(m.movie_id)`)
+- `avg_rating` (`AVG(m.rating)`, rounded to 2 decimals)
 
 **Steps:**
 1. `USE p05;`
-2. Create the view **`v_customer_totals`** with the requirements above.  
-3. Verify:  
-   - `SELECT * FROM v_customer_totals;`  
-   - Optionally, `DESCRIBE v_customer_totals;`
+2. Create the view:
+   ```sql
+   CREATE OR REPLACE VIEW v_director_stats AS
+   SELECT
+     d.director_id,
+     d.name AS director_name,
+     COUNT(m.movie_id) AS film_count,
+     ROUND(AVG(m.rating), 2) AS avg_rating
+   FROM directors d
+   LEFT JOIN movies m ON m.director_id = d.director_id
+   GROUP BY d.director_id, d.name;
+   ```
+3. Verify:
+   ```sql
+   SELECT * FROM v_director_stats ORDER BY avg_rating DESC;
+   ```
 
 ---
 
 ## 📝 Task 2: Create a Simple Function (0.5)
-Create a **deterministic** scalar function named **`spend_category`** that classifies a numeric total into a text label.
+
+Create a **deterministic** scalar function **`rating_level`** that classifies a movie rating.
 
 **Requirements:**
-- Signature: `spend_category(total DECIMAL(10,2)) RETURNS VARCHAR(20)`
+- Signature: `rating_level(score DECIMAL(3,1)) RETURNS VARCHAR(20)`
 - Logic:
-  - `NULL` or `0` → `'none'`
-  - `total < 100` → `'low'`
-  - `total < 200` → `'medium'`
-  - otherwise → `'high'`
+  - `NULL` → `'unrated'`
+  - `< 6.0` → `'weak'`
+  - `< 7.5` → `'decent'`
+  - `< 8.5` → `'strong'`
+  - otherwise → `'excellent'`
+- Use a **single-statement** `RETURN CASE …` (no delimiter hassles).
+- Then use it with `v_director_stats` or `movies`.
 
 **Steps:**
-1. `USE p05;`  
-2. `DROP FUNCTION IF EXISTS spend_category;`  
-3. Create the function:  
+1. Ensure DB: `USE p05;`
+2. Create the function:
    ```sql
-   CREATE FUNCTION spend_category(total DECIMAL(10,2))
+   DROP FUNCTION IF EXISTS rating_level;
+   CREATE FUNCTION rating_level(score DECIMAL(3,1))
    RETURNS VARCHAR(20)
    DETERMINISTIC
    RETURN CASE
-     WHEN total IS NULL OR total = 0 THEN 'none'
-     WHEN total < 100 THEN 'low'
-     WHEN total < 200 THEN 'medium'
-     ELSE 'high'
+     WHEN score IS NULL THEN 'unrated'
+     WHEN score < 6.0  THEN 'weak'
+     WHEN score < 7.5  THEN 'decent'
+     WHEN score < 8.5  THEN 'strong'
+     ELSE 'excellent'
    END;
    ```
-4. Verify:  
+3. Verify with the **movies** table:
    ```sql
-   SELECT spend_category(NULL), spend_category(0), spend_category(50), spend_category(150), spend_category(250);
+   SELECT title, rating, rating_level(rating) AS category
+   FROM movies
+   ORDER BY rating DESC;
+   ```
+   Or with the **view**:
+   ```sql
+   SELECT director_name, avg_rating, rating_level(avg_rating) AS avg_rating_bucket
+   FROM v_director_stats
+   ORDER BY avg_rating DESC;
    ```
 
 ---
 
 ## 📝 Task 3: Create a Procedure for Insert/Delete (0.5)
-Create a stored procedure **`manage_order`** that performs **INSERT** or **DELETE** on the `orders` table based on an input parameter.
+
+Create a stored procedure **`manage_movie`** that can **INSERT** or **DELETE** rows in the `movies` table based on an input parameter.
 
 **Requirements:**
-- Inputs:  
-  - `action_type VARCHAR(10)` → `'INSERT'` or `'DELETE'`  
-  - `p_order_id INT`  
-  - `p_customer_id INT`  
-  - `p_amount DECIMAL(10,2)`  
-  - `p_channel VARCHAR(20)`  
-- Behavior:  
-  - If `action_type = 'INSERT'`: insert row into `orders`  
-  - If `action_type = 'DELETE'`: delete from `orders` by `order_id`  
+- Inputs:
+  - `action_type VARCHAR(10)` → `'INSERT'` or `'DELETE'` (case-insensitive)
+  - `p_movie_id INT`
+  - `p_director_id INT`
+  - `p_title VARCHAR(100)`
+  - `p_year INT`
+  - `p_rating DECIMAL(3,1)`
+- Behavior:
+  - If `action_type = 'INSERT'`: insert a new row into `movies`
+  - If `action_type = 'DELETE'`: delete by `movie_id`
+  - Otherwise: raise an error with `SIGNAL SQLSTATE '45000'`
 
 **Steps:**
-1. `USE p05;`  
-2. `DROP PROCEDURE IF EXISTS manage_order;`  
-3. Create the procedure:  
+1. `USE p05;`
+2. Create the procedure (note delimiter change):
    ```sql
+   DROP PROCEDURE IF EXISTS manage_movie;
    DELIMITER $$
 
-   CREATE PROCEDURE manage_order(
-       IN action_type VARCHAR(10),
-       IN p_order_id INT,
-       IN p_customer_id INT,
-       IN p_amount DECIMAL(10,2),
-       IN p_channel VARCHAR(20)
+   CREATE PROCEDURE manage_movie(
+     IN action_type VARCHAR(10),
+     IN p_movie_id INT,
+     IN p_director_id INT,
+     IN p_title VARCHAR(100),
+     IN p_year INT,
+     IN p_rating DECIMAL(3,1)
    )
    BEGIN
-       IF UPPER(action_type) = 'INSERT' THEN
-           INSERT INTO orders(order_id, customer_id, amount, channel)
-           VALUES (p_order_id, p_customer_id, p_amount, p_channel);
+     IF UPPER(action_type) = 'INSERT' THEN
+       INSERT INTO movies(movie_id, director_id, title, release_year, rating)
+       VALUES (p_movie_id, p_director_id, p_title, p_year, p_rating);
 
-       ELSEIF UPPER(action_type) = 'DELETE' THEN
-           DELETE FROM orders
-           WHERE order_id = p_order_id;
+     ELSEIF UPPER(action_type) = 'DELETE' THEN
+       DELETE FROM movies WHERE movie_id = p_movie_id;
 
-       ELSE
-           SIGNAL SQLSTATE '45000'
-               SET MESSAGE_TEXT = 'Invalid action_type. Use INSERT or DELETE.';
-       END IF;
+     ELSE
+       SIGNAL SQLSTATE '45000'
+         SET MESSAGE_TEXT = 'Invalid action_type. Use INSERT or DELETE.';
+     END IF;
    END$$
 
    DELIMITER ;
    ```
-4. Verify:  
-   - `CALL manage_order('INSERT', 999, 1, 42.50, 'web');`  
-   - `CALL manage_order('DELETE', 999, NULL, NULL, NULL);`
+3. Verify:
+   ```sql
+   -- Insert a new movie
+   CALL manage_movie('INSERT', 999, 2, 'Tenet', 2020, 7.3);
+   SELECT * FROM movies WHERE movie_id = 999;
+
+   -- Delete that movie
+   CALL manage_movie('DELETE', 999, NULL, NULL, NULL, NULL);
+   SELECT * FROM movies WHERE movie_id = 999;
+
+   -- Expect error
+   CALL manage_movie('UPSERT', 1, 1, 'X', 2000, 5.0);
+   ```
 
 ---
+
+### ✅ Points
+- View: **0.25**
+- Function: **0.5**
+- Procedure: **0.5**
+
+Good luck & have fun! 🎬
