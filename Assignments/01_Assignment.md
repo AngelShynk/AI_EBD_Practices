@@ -37,9 +37,8 @@ You can earn up to **2 bonus points** by incorporating the following:
 
 | Bonus Task                          | Points |
 |-------------------------------------|--------|
-| Publish source code to GitHub       | +0.5   |
-| Use `UNION` or `UNION ALL`          | +0.5   |
-| Use a Common Table Expression (CTE) | +1.0   |
+| Publish source code to GitHub       | +1     |
+| Use `UNION` or `UNION ALL`          | +1     |
 
 ---
 
