@@ -1,0 +1,67 @@
+-- 1. Setup
+
+DROP DATABASE IF EXISTS P07;
+CREATE DATABASE P07;
+USE P07;
+
+
+
+SET autocommit = 0;
+SET SQL_SAFE_UPDATES = 0;
+
+SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+
+
+-- Create a simple table
+CREATE TABLE accounts (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  holder VARCHAR(100) NOT NULL,
+  balance DECIMAL(12,2) NOT NULL DEFAULT 0.00
+) ENGINE=InnoDB;
+
+INSERT INTO accounts (holder, balance) VALUES
+  ('Alice', 1000.00),
+  ('Bob',   500.00);
+
+-- Show starting state
+SELECT * FROM accounts ORDER BY id;
+
+-- Session A
+
+-- SESSION A
+
+USE PO7;
+SET autocommit = 0;
+SET SQL_SAFE_UPDATES = 0;
+
+SELECT * FROM  accounts;
+
+SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
+
+START TRANSACTION;
+
+UPDATE accounts SET balance = 999 WHERE holder = 'Alice';
+
+ROLLBACK;
+
+COMMIT;
+
+
+-- Session B
+
+-- SESSION B
+
+USE P07;
+SET autocommit = 0;
+SET SQL_SAFE_UPDATES = 0;
+
+
+SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
+START TRANSACTION;
+
+SELECT * FROM  accounts;
+
+;
+COMMIT;
+
+
