@@ -31,7 +31,7 @@ Teams consist of 2–3 students and are formed independently by the students. Wo
 
 
 
-## 🧠 12 Practice Questions About DWH & Modeling
+## 🧠 Practice Questions About DWH & Modeling
 
 1. What is a fact table and what kind of data does it store?  
 2. What is a dimension table and how does it relate to a fact table?  
