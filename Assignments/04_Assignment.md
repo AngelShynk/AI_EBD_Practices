@@ -1,4 +1,4 @@
-# Assignment: Steam Dataset Analysis (17 Points)
+# Assignment: Steam Dataset Analysis
 
 ## Overview
 
